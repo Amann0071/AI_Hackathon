@@ -4,7 +4,7 @@
     "name": "Prime Minister's Employment Generation Programme (PMEGP)",
     "category": "Entrepreneurship",
     "ministry": "Ministry of MSME",
-    "benefit_summary": "15% to 35% subsidy on project cost up to ₹50 Lakh (Manufacturing) or ₹20 Lakh (Service).",
+    "benefit_summary": "15% to 35% margin money subsidy on project cost up to ₹50 Lakh (Manufacturing) or ₹20 Lakh (Service).",
     "benefit_score": 95,
     "official_url": "https://www.kviconline.gov.in/pmegpeportal/",
     "rules": {
@@ -14,16 +14,15 @@
       "occupations": ["entrepreneur", "unemployed", "self_employed"],
       "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
       "gender": ["Male", "Female", "Other"],
-      "min_education": "8th_pass_for_large_projects",
       "requires_new_project": true
     }
   },
   {
-    "id": "PM_MUDRA_SHISHU_KISHORE",
+    "id": "PM_MUDRA_YOJANA",
     "name": "Pradhan Mantri MUDRA Yojana (PMMY)",
     "category": "Entrepreneurship",
     "ministry": "Ministry of Finance",
-    "benefit_summary": "Collateral-free micro-business loans up to ₹10 Lakh (Shishu, Kishore, Tarun).",
+    "benefit_summary": "Collateral-free micro-enterprise loans up to ₹10 Lakh (Shishu, Kishore, Tarun).",
     "benefit_score": 88,
     "official_url": "https://www.mudra.org.in/",
     "rules": {
@@ -60,8 +59,8 @@
     "name": "PM Vishwakarma Yojana",
     "category": "Artisan & Skill",
     "ministry": "Ministry of MSME",
-    "benefit_summary": "₹15,000 toolkit e-voucher, ₹500/day stipend during skill training, and collateral-free loans up to ₹3 Lakh at 5% interest.",
-    "benefit_score": 85,
+    "benefit_summary": "₹15,000 toolkit e-voucher, ₹500/day skill training stipend, and loans up to ₹3 Lakh at 5% concessional interest.",
+    "benefit_score": 86,
     "official_url": "https://pmvishwakarma.gov.in/",
     "rules": {
       "min_age": 18,
@@ -78,7 +77,7 @@
     "name": "Post-Matric Scholarship for SC/ST Students",
     "category": "Education",
     "ministry": "Ministry of Social Justice & Empowerment",
-    "benefit_summary": "100% tuition fee reimbursement plus monthly academic maintenance allowance.",
+    "benefit_summary": "Tuition fee support and monthly academic maintenance allowance for post-matric students.",
     "benefit_score": 92,
     "official_url": "https://scholarships.gov.in/",
     "rules": {
@@ -96,8 +95,8 @@
     "name": "AICTE Pragati Scholarship for Girl Students",
     "category": "Education",
     "ministry": "Ministry of Education (AICTE)",
-    "benefit_summary": "₹50,000 per annum for every year of study for girls admitted to Technical Degree/Diploma courses.",
-    "benefit_score": 90,
+    "benefit_summary": "₹50,000 per year for girls pursuing technical degree or diploma programs.",
+    "benefit_score": 91,
     "official_url": "https://www.aicte-india.org/",
     "rules": {
       "min_age": 16,
@@ -114,8 +113,8 @@
     "name": "Central Sector Scheme of Scholarship for College & University Students",
     "category": "Education",
     "ministry": "Ministry of Education",
-    "benefit_summary": "₹12,000/year for graduation (first 3 years) and ₹20,000/year for post-graduation / 4th-5th year.",
-    "benefit_score": 82,
+    "benefit_summary": "₹12,000/year for undergraduate study (first 3 years) and ₹20,000/year for higher/PG study.",
+    "benefit_score": 83,
     "official_url": "https://scholarships.gov.in/",
     "rules": {
       "min_age": 17,
@@ -132,7 +131,7 @@
     "name": "PM Street Vendor's AtmaNirbhar Nidhi (PM SVANidhi)",
     "category": "Micro-Enterprise",
     "ministry": "Ministry of Housing & Urban Affairs",
-    "benefit_summary": "Working capital loans starting at ₹10,000 (scaling up to ₹50,000) with 7% interest subsidy and digital cashback.",
+    "benefit_summary": "Working capital loans starting at ₹10,000 (scaling up to ₹50,000+) with interest subsidy and digital incentives.",
     "benefit_score": 80,
     "official_url": "https://pmsvanidhi.mohua.gov.in/",
     "rules": {
@@ -140,6 +139,132 @@
       "max_age": null,
       "max_annual_income": 300000,
       "occupations": ["street_vendor", "small_business"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "PM_KISAN",
+    "name": "Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)",
+    "category": "Agriculture & Rural",
+    "ministry": "Ministry of Agriculture & Farmers Welfare",
+    "benefit_summary": "₹6,000 per year financial support in three equal installments of ₹2,000 to eligible farmer families.",
+    "benefit_score": 84,
+    "official_url": "https://pmkisan.gov.in/",
+    "rules": {
+      "min_age": 18,
+      "max_age": null,
+      "max_annual_income": null,
+      "occupations": ["farmer"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "LAKHPATI_DIDI_SHG",
+    "name": "Lakhpati Didi / DAY-NRLM Women Livelihood Support",
+    "category": "Women Empowerment",
+    "ministry": "Ministry of Rural Development",
+    "benefit_summary": "Skill training, credit linkage, and enterprise mentorship aimed at helping women households build sustainable ₹1 Lakh+ annual income.",
+    "benefit_score": 89,
+    "official_url": "https://aajeevika.gov.in/",
+    "rules": {
+      "min_age": 18,
+      "max_age": 60,
+      "max_annual_income": 300000,
+      "occupations": ["self_employed", "entrepreneur", "small_business", "artisan", "farmer"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Female"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "NSP_PRE_POST_MINORITY",
+    "name": "Merit-cum-Means & Minority Higher Education Support",
+    "category": "Education",
+    "ministry": "Ministry of Minority Affairs",
+    "benefit_summary": "Financial assistance for technical and professional degree/post-graduate courses for eligible minority students.",
+    "benefit_score": 85,
+    "official_url": "https://scholarships.gov.in/",
+    "rules": {
+      "min_age": 17,
+      "max_age": 30,
+      "max_annual_income": 250000,
+      "occupations": ["student"],
+      "social_categories": ["Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "STARTUP_INDIA_SEED_FUND",
+    "name": "Startup India Seed Fund Scheme (SISFS) — Early Stage",
+    "category": "Entrepreneurship",
+    "ministry": "DPIIT, Ministry of Commerce & Industry",
+    "benefit_summary": "Proof-of-concept and prototype/commercialization support for early-stage innovators and founders.",
+    "benefit_score": 90,
+    "official_url": "https://seedfund.startupindia.gov.in/",
+    "rules": {
+      "min_age": 18,
+      "max_age": 45,
+      "max_annual_income": null,
+      "occupations": ["entrepreneur"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": true
+    }
+  },
+  {
+    "id": "PM_YASASVI_OBC_EBC",
+    "name": "PM-YASASVI Post-Matric Scholarship for OBC, EBC & DNT Students",
+    "category": "Education",
+    "ministry": "Ministry of Social Justice & Empowerment",
+    "benefit_summary": "Academic allowance and fee support for OBC/EBC/DNT students studying in Class 11 through post-graduation.",
+    "benefit_score": 87,
+    "official_url": "https://yet.nta.ac.in/",
+    "rules": {
+      "min_age": 15,
+      "max_age": 30,
+      "max_annual_income": 250000,
+      "occupations": ["student"],
+      "social_categories": ["OBC", "General"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "KCC_WORKING_CAPITAL",
+    "name": "Kisan Credit Card (KCC) Crop & Allied Credit",
+    "category": "Agriculture & Rural",
+    "ministry": "Department of Financial Services / Agriculture",
+    "benefit_summary": "Flexible working credit at concessional interest rates for crop production, dairy, and allied activities.",
+    "benefit_score": 82,
+    "official_url": "https://www.myscheme.gov.in/",
+    "rules": {
+      "min_age": 18,
+      "max_age": 75,
+      "max_annual_income": null,
+      "occupations": ["farmer", "small_business"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "NATIONAL_APPRENTICESHIP_NAPS",
+    "name": "National Apprenticeship Promotion Scheme (NAPS)",
+    "category": "Skill & Employment",
+    "ministry": "Ministry of Skill Development & Entrepreneurship",
+    "benefit_summary": "On-the-job training with government stipend support (DBT) and industry-recognized apprenticeship certification.",
+    "benefit_score": 78,
+    "official_url": "https://www.apprenticeshipindia.gov.in/",
+    "rules": {
+      "min_age": 14,
+      "max_age": 35,
+      "max_annual_income": null,
+      "occupations": ["student", "unemployed"],
       "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
       "gender": ["Male", "Female", "Other"],
       "requires_new_project": false
