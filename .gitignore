@@ -1,6 +1,8 @@
 .env
 .env.*
 !.env.example
+node_modules/
+.vercel/
 .venv/
 .venv-1/
 Lib/
