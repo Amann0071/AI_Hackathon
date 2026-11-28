@@ -1,9 +1,10 @@
-@"
 .env
+.env.*
+!.env.example
 .venv/
+.venv-1/
 Lib/
 Scripts/
 Include/
 __pycache__/
 *.pyc
-"@ | Out-File -FilePath .gitignore -Encoding utf8
