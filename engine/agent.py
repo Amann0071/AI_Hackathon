@@ -167,8 +167,49 @@ def _ask_question_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+def _explain_gap(reason: str) -> str:
+    occupation_match = re.search(r"Intended for (.+?) \(your occupation: (.+?)\)\.", reason)
+    if occupation_match:
+        eligible_occupations = occupation_match.group(1).replace("_", " ")
+        current_occupation = occupation_match.group(2).replace("_", " ")
+        return (
+            f"Occupation criterion: applicants must be one of {eligible_occupations}. "
+            f"Your profile lists {current_occupation}, which is not included. "
+            "This near-match applies only if you also meet one of the listed occupation requirements."
+        )
+
+    category_match = re.search(r"Limited to (.+?) categories \(your category: (.+?)\)\.", reason)
+    if category_match:
+        return (
+            f"Social-category requirement: applicants must be in {category_match.group(1)}. "
+            f"Your profile says {category_match.group(2)}."
+        )
+
+    gender_match = re.search(r"Applicable to (.+?) applicants\.", reason)
+    if gender_match:
+        return f"Gender requirement: applicants must be {gender_match.group(1)}."
+
+    minimum_age = re.search(r"Minimum age required is (\d+)", reason)
+    if minimum_age:
+        return f"Age requirement: applicants must be at least {minimum_age.group(1)} years old."
+
+    maximum_age = re.search(r"Maximum age limit is (\d+)", reason)
+    if maximum_age:
+        return f"Age requirement: applicants must be no older than {maximum_age.group(1)} years."
+
+    income_limit = re.search(r"exceeds the ₹([\d,]+) limit", reason)
+    if income_limit:
+        return f"Income requirement: annual income must not exceed ₹{income_limit.group(1)}."
+
+    if "Requires a new (greenfield) project" in reason:
+        return "Project requirement: the business must be a new (greenfield) project."
+
+    return f"Eligibility requirement: {reason}"
+
+
 def _evaluate_and_explain_node(state: AgentState) -> Dict[str, Any]:
-    results = evaluate_profile(state.get("profile") or {})
+    profile = state.get("profile") or {}
+    results = evaluate_profile(profile)
     exact_matches = results["exact_matches"]
     near_misses = results["near_misses"]
     sections = []
@@ -186,7 +227,8 @@ def _evaluate_and_explain_node(state: AgentState) -> Dict[str, Any]:
         lines = ["Potential near-matches:"]
         for scheme in near_misses[:5]:
             gap = scheme["failed_reasons"][0] if scheme["failed_reasons"] else "One eligibility detail needs checking."
-            lines.append(f"- {scheme['name']}: {gap}")
+            lines.append(f"- {scheme['name']}")
+            lines.append(f"  What you need to meet: {_explain_gap(gap)}")
             lines.append(f"  Official details: {scheme['official_url']}")
         sections.append("\n".join(lines))
 

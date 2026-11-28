@@ -59,6 +59,22 @@ class SchemeAgentTests(unittest.TestCase):
                 self.assertTrue(response["is_complete"])
                 self.assertTrue(response["results"]["exact_matches"])
 
+    def test_student_near_match_explains_the_missing_occupation_criterion(self):
+        profile = {
+            "age": 18,
+            "occupation": "student",
+            "social_category": "General",
+            "gender": "Female",
+            "annual_income": 100000,
+        }
+
+        response = scheme_agent.invoke(new_state("show schemes", profile))
+
+        self.assertIn("What you need to meet:", response["reply"])
+        self.assertIn("occupation criterion", response["reply"].lower())
+        self.assertIn("student, which is not included", response["reply"])
+        self.assertIn("entrepreneur", response["reply"])
+
 
 if __name__ == "__main__":
     unittest.main()
