@@ -227,7 +227,7 @@
       let geminiHistory = [];
 
       function buildGeminiPrompt() {
-        const instructions = "You are a helpful Indian government-scheme assistant. Ask one question at a time to learn age, occupation, social category, gender, and annual family income. Then list possible eligible schemes and near-matches, state unmet criteria, avoid inventing eligibility rules, and advise checking official portals.";
+        const instructions = "You are a helpful Indian government-scheme assistant. Ask one question at a time to learn age, occupation, social category, gender, and annual family income. Once you have enough details, label and show eligible schemes in a Markdown table with Scheme, Category, Benefit, and Official details columns; label near-matches separately in a Markdown table with Scheme, Criteria to meet, and Official details columns. Explain unmet criteria. Do not invent schemes, benefits, URLs, or eligibility rules; say when unsure and advise checking official portals. Keep follow-up questions as normal text, not a table.";
         let turns = geminiHistory.slice(-8);
         let conversation = turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n");
         while (instructions.length + conversation.length + 2 > 2000 && turns.length > 1) {
@@ -255,9 +255,11 @@
 
       function addTable(parent, title, columns, rows, getCells) {
         if (!rows.length) return;
-        const heading = document.createElement("h3");
-        heading.textContent = title;
-        parent.appendChild(heading);
+        if (title) {
+          const heading = document.createElement("h3");
+          heading.textContent = title;
+          parent.appendChild(heading);
+        }
 
         const wrapper = document.createElement("div");
         wrapper.className = "table-wrap";
@@ -297,6 +299,80 @@
         parent.appendChild(wrapper);
       }
 
+      function splitMarkdownTableRow(line) {
+        let content = line.trim();
+        if (content.startsWith("|")) content = content.slice(1);
+        if (content.endsWith("|")) content = content.slice(0, -1);
+        return content.split("|").map((cell) => cell.trim().replace(/\\\|/g, "|"));
+      }
+
+      function isMarkdownTableSeparator(line) {
+        const cells = splitMarkdownTableRow(line);
+        return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+      }
+
+      function parseMarkdownTableCell(value) {
+        const link = /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/i.exec(value);
+        return link ? {label: link[1], href: link[2]} : value;
+      }
+
+      function renderAssistantReply(parent, text) {
+        const lines = text.split(/\r?\n/);
+        let pendingText = [];
+        let hasTable = false;
+        let index = 0;
+
+        function flushText() {
+          const content = pendingText.join("\n").trim();
+          if (content) {
+            for (const block of content.split(/\n{2,}/)) {
+              const headingText = block.trim().replace(/:$/, "");
+              if (/^(eligible schemes|potential near-matches)$/i.test(headingText)) {
+                const heading = document.createElement("h3");
+                heading.textContent = headingText;
+                parent.appendChild(heading);
+              } else {
+                const paragraph = document.createElement("p");
+                paragraph.textContent = block;
+                parent.appendChild(paragraph);
+              }
+            }
+          }
+          pendingText = [];
+        }
+
+        while (index < lines.length) {
+          if (
+            index + 1 < lines.length &&
+            lines[index].includes("|") &&
+            isMarkdownTableSeparator(lines[index + 1])
+          ) {
+            flushText();
+            const columns = splitMarkdownTableRow(lines[index]);
+            const rows = [];
+            index += 2;
+            while (index < lines.length && lines[index].trim() && lines[index].includes("|")) {
+              const cells = splitMarkdownTableRow(lines[index]);
+              rows.push(columns.map((_, cellIndex) => parseMarkdownTableCell(cells[cellIndex] || "")));
+              index += 1;
+            }
+
+            if (rows.length) {
+              addTable(parent, "", columns, rows, (row) => row);
+              hasTable = true;
+            } else {
+              pendingText.push(lines[index - 2], lines[index - 1]);
+            }
+            continue;
+          }
+          pendingText.push(lines[index]);
+          index += 1;
+        }
+
+        flushText();
+        if (hasTable) parent.classList.add("results");
+      }
+
       function addMessage(role, text, results) {
         const node = document.createElement("div");
         node.className = `message ${role}`;
@@ -321,6 +397,8 @@
           const note = document.createElement("p");
           note.textContent = "Please verify current eligibility and application details on the official scheme portal.";
           node.appendChild(note);
+        } else if (role === "assistant") {
+          renderAssistantReply(node, text);
         } else {
           node.textContent = text;
         }
