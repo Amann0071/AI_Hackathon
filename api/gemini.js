@@ -3,6 +3,8 @@ const GEMINI_MODEL = "gemini-3.8-flash";
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
+export const config = { maxDuration: 30 };
+
 function redactApiKey(message, apiKey) {
   return String(message).split(apiKey).join("[REDACTED]").slice(0, 1000);
 }
@@ -54,7 +56,7 @@ export default async function handler(req, res) {
 
   // Stop waiting if the upstream request takes too long.
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), 25000);
   try {
     const response = await fetch(GEMINI_URL, {
       method: "POST",
