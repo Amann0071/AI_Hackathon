@@ -1,50 +1,9 @@
-import json
-import os
-from typing import Any, Dict, List, Optional, TypedDict
+import re
+from typing import Any, Dict, List, TypedDict
 
-from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage  # pyright: ignore[reportMissingImports]
-from langchain_google_genai import ChatGoogleGenerativeAI  # pyright: ignore[reportMissingImports]
 from langgraph.graph import END, START, StateGraph  # pyright: ignore[reportMissingImports]
-from pydantic import BaseModel, Field
 
 from engine.rules_engine import evaluate_profile
-
-load_dotenv()
-
-
-class ExtractedProfile(BaseModel):
-    language: Optional[str] = Field(
-        default=None,
-        description="Preferred response language mentioned or used by the user (e.g., 'English', 'Hindi').",
-    )
-    age: Optional[int] = Field(default=None, description="User's age in years.")
-    annual_income: Optional[int] = Field(
-        default=None,
-        description="Annual family/personal income in INR as an integer (e.g., 250000 for 2.5 lakh).",
-    )
-    occupation: Optional[str] = Field(
-        default=None,
-        description=(
-            "Normalized occupation: 'student', 'entrepreneur', 'unemployed', "
-            "'self_employed', 'small_business', 'artisan', or 'street_vendor'."
-        ),
-    )
-    social_category: Optional[str] = Field(
-        default=None,
-        description="Social category if mentioned: 'General', 'OBC', 'SC', 'ST', or 'Minority'.",
-    )
-    gender: Optional[str] = Field(
-        default=None,
-        description="Gender if mentioned: 'Male', 'Female', or 'Other'.",
-    )
-    is_new_project: Optional[bool] = Field(
-        default=None,
-        description=(
-            "True if starting a brand-new venture/project, False if running an existing one, "
-            "or None if not applicable or unmentioned."
-        ),
-    )
 
 
 class AgentState(TypedDict):
@@ -56,157 +15,189 @@ class AgentState(TypedDict):
     is_complete: bool
 
 
-def get_llm(temperature: float = 0.2) -> ChatGoogleGenerativeAI:
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=temperature,
-        api_key=api_key,
-    )
-
-
 REQUIRED_CORE_FIELDS = ["age", "occupation", "social_category", "gender", "annual_income"]
 
 
 def get_missing_fields(profile: Dict[str, Any]) -> List[str]:
     missing = [field for field in REQUIRED_CORE_FIELDS if profile.get(field) is None]
-    occ = (profile.get("occupation") or "").lower()
-    if occ in ["entrepreneur", "unemployed", "self_employed", "small_business"]:
+    occupation = (profile.get("occupation") or "").lower()
+    if occupation in ["entrepreneur", "unemployed", "self_employed", "small_business"]:
         if profile.get("is_new_project") is None:
             missing.append("is_new_project")
     return missing
 
 
-def extract_node(state: AgentState) -> Dict[str, Any]:
-    """Extracts profile slots and language preference from the latest user message."""
-    last_user_msg = ""
-    for msg in reversed(state.get("messages", [])):
-        if msg.get("role") == "user":
-            last_user_msg = msg.get("content", "")
+def _extract_income(text: str) -> int | None:
+    match = re.search(
+        r"\b(?:annual|family|household|yearly)?\s*income\b.{0,24}?"
+        r"(?:₹|rs\.?\s*)?([\d,]+(?:\.\d+)?)\s*"
+        r"(lakh|lakhs|lac|lacs|l|crore|crores|cr|thousand|k)?\b",
+        text,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    amount = float(match.group(1).replace(",", ""))
+    unit = (match.group(2) or "").lower()
+    if unit in {"lakh", "lakhs", "lac", "lacs", "l"}:
+        amount *= 100_000
+    elif unit in {"crore", "crores", "cr"}:
+        amount *= 10_000_000
+    elif unit in {"thousand", "k"}:
+        amount *= 1_000
+    return int(amount)
+
+
+def _extract_node(state: AgentState) -> Dict[str, Any]:
+    last_user_message = next(
+        (
+            message.get("content", "")
+            for message in reversed(state.get("messages", []))
+            if message.get("role") == "user"
+        ),
+        "",
+    )
+    text = last_user_message.strip()
+    lowered = text.lower()
+    profile = dict(state.get("profile") or {})
+    language = state.get("language") or "English"
+
+    age_match = re.search(
+        r"\b(?:age|aged)\s*(?:is|:)?\s*(\d{1,3})\b|\bi am\s+(\d{1,3})\b",
+        lowered,
+    )
+    if age_match:
+        age = int(age_match.group(1) or age_match.group(2))
+        if 0 <= age <= 120:
+            profile["age"] = age
+
+    occupations = [
+        (r"\b(?:small business|small-business)\b", "small_business"),
+        (r"\b(?:self[- ]employed|self employed)\b", "self_employed"),
+        (r"\b(?:street vendor|street-vendor|hawker)\b", "street_vendor"),
+        (r"\b(?:entrepreneur|business owner|starting a business)\b", "entrepreneur"),
+        (r"\b(?:student|pupil|college student)\b", "student"),
+        (r"\b(?:unemployed|job seeker|looking for work)\b", "unemployed"),
+        (r"\b(?:artisan|craftsperson|craft worker)\b", "artisan"),
+        (r"\bfarmer\b", "farmer"),
+    ]
+    for pattern, occupation in occupations:
+        if re.search(pattern, lowered):
+            profile["occupation"] = occupation
             break
 
-    current_profile = dict(state.get("profile") or {})
-    current_lang = state.get("language") or "English"
+    category_match = re.search(r"\b(sc|st|obc|minority|general)\b", lowered)
+    if category_match:
+        profile["social_category"] = category_match.group(1).upper()
+        if profile["social_category"] == "GENERAL":
+            profile["social_category"] = "General"
 
-    if not last_user_msg.strip():
-        return {"profile": current_profile, "language": current_lang}
+    if re.search(r"\b(?:female|woman|women|girl)\b", lowered):
+        profile["gender"] = "Female"
+    elif re.search(r"\b(?:male|man|men|boy)\b", lowered):
+        profile["gender"] = "Male"
+    elif re.search(r"\b(?:nonbinary|non-binary|other gender)\b", lowered):
+        profile["gender"] = "Other"
 
-    llm = get_llm(temperature=0.0)
-    extractor = llm.with_structured_output(ExtractedProfile)
+    income = _extract_income(lowered)
+    if income is not None:
+        profile["annual_income"] = income
 
-    prompt = [
-        SystemMessage(
-            content=(
-                "Extract structured eligibility fields and language preference from the user's message. "
-                "Convert amounts like '2.5 lakh' or '2.5L' to integer 250000. "
-                "Only populate fields clearly stated or strongly implied in this turn; leave others null."
-            )
-        ),
-        HumanMessage(
-            content=(
-                f"Existing profile: {json.dumps(current_profile)}\n"
-                f"Latest user message: {last_user_msg}"
-            )
-        ),
-    ]
+    if re.search(r"\b(?:new project|new business|starting a new|brand.new)\b", lowered):
+        profile["is_new_project"] = True
+    elif re.search(r"\b(?:existing business|already running|not a new)\b", lowered):
+        profile["is_new_project"] = False
 
-    try:
-        extracted: ExtractedProfile = extractor.invoke(prompt)
-        data = extracted.model_dump(exclude_none=True)
-        if "language" in data and data["language"]:
-            current_lang = data.pop("language")
-        for key, value in data.items():
-            current_profile[key] = value
-    except Exception:
-        pass
+    if re.search(r"[\u0900-\u097f]|\bhindi\b|\bहिंदी\b", lowered):
+        language = "Hindi"
+    elif re.search(r"\benglish\b", lowered):
+        language = "English"
 
-    return {"profile": current_profile, "language": current_lang}
+    return {"profile": profile, "language": language}
 
 
-def route_after_extract(state: AgentState) -> str:
+QUESTIONS = {
+    "age": ("What is your age in years?", "आपकी उम्र कितनी है?"),
+    "occupation": (
+        "What do you currently do (for example, student, farmer, entrepreneur, or looking for work)?",
+        "आप अभी क्या काम करते हैं (जैसे विद्यार्थी, किसान, उद्यमी या नौकरी की तलाश में)?",
+    ),
+    "social_category": (
+        "Which social category applies to you: General, OBC, SC, ST, or Minority?",
+        "आपकी सामाजिक श्रेणी क्या है: General, OBC, SC, ST या Minority?",
+    ),
+    "gender": ("What is your gender?", "आपका लिंग क्या है?"),
+    "annual_income": (
+        "What is your approximate annual family income in rupees?",
+        "आपकी परिवार की अनुमानित वार्षिक आय कितनी है?",
+    ),
+    "is_new_project": (
+        "Is this a new project/business, or are you already running it?",
+        "क्या यह नया व्यवसाय/परियोजना है या पहले से चल रहा है?",
+    ),
+}
+
+
+def _ask_question_node(state: AgentState) -> Dict[str, Any]:
     missing = get_missing_fields(state.get("profile") or {})
-    if len(missing) > 0:
-        return "ask_question"
-    return "evaluate_and_explain"
+    if not missing:
+        return {"reply": "Please share one more detail so I can check your eligibility.", "is_complete": False}
 
-
-def ask_question_node(state: AgentState) -> Dict[str, Any]:
-    """Asks one adaptive question for the next missing profile field."""
-    profile = state.get("profile") or {}
-    lang = state.get("language") or "English"
-    missing = get_missing_fields(profile)
-    history = state.get("messages") or []
-
-    llm = get_llm(temperature=0.4)
-    prompt = [
-        SystemMessage(
-            content=(
-                f"You are a friendly Indian Government Scheme Assistant. Respond in {lang}. "
-                "Ask ONE clear, conversational question to collect the next missing detail. "
-                "Adapt naturally to what you already know about the user, and avoid asking multiple questions at once."
-            )
-        ),
-        HumanMessage(
-            content=(
-                f"Collected profile: {json.dumps(profile)}\n"
-                f"Missing fields (priority order): {missing}\n"
-                f"Recent messages: {json.dumps(history[-6:])}\n"
-                f"Target field to ask about now: {missing[0]}"
-            )
-        ),
-    ]
-
-    response = llm.invoke(prompt)
+    language_index = 1 if (state.get("language") or "").lower().startswith("hindi") else 0
     return {
-        "reply": response.content,
+        "reply": QUESTIONS[missing[0]][language_index],
         "is_complete": False,
     }
 
 
-def evaluate_and_explain_node(state: AgentState) -> Dict[str, Any]:
-    """Evaluates rules deterministically and generates grounded explanations and near-misses."""
-    profile = state.get("profile") or {}
-    lang = state.get("language") or "English"
-    results = evaluate_profile(profile)
+def _evaluate_and_explain_node(state: AgentState) -> Dict[str, Any]:
+    results = evaluate_profile(state.get("profile") or {})
+    exact_matches = results["exact_matches"]
+    near_misses = results["near_misses"]
+    sections = []
 
-    llm = get_llm(temperature=0.3)
-    prompt = [
-        SystemMessage(
-            content=(
-                f"You are a clear, trustworthy Indian Government Scheme eligibility advisor. Respond in {lang}. "
-                "Using ONLY the provided evaluation results:\n"
-                "1. Present ranked Eligible Schemes with clear 'Why you qualify' points and benefit summary.\n"
-                "2. Present Near-Miss Schemes (if any), explaining the single condition/gap and what could bridge it.\n"
-                "3. Add a brief note to verify official requirements on the scheme portal before applying.\n"
-                "Do not invent schemes or eligibility rules not present in the evaluation results."
-            )
-        ),
-        HumanMessage(
-            content=(
-                f"User profile: {json.dumps(profile)}\n"
-                f"Evaluation results: {json.dumps(results)}"
-            )
-        ),
-    ]
+    if exact_matches:
+        lines = ["Eligible schemes:"]
+        for scheme in exact_matches[:5]:
+            lines.append(f"- {scheme['name']}: {scheme['benefit_summary']}")
+            lines.append(f"  Official details: {scheme['official_url']}")
+        sections.append("\n".join(lines))
+    else:
+        sections.append("No exact matches found for the details provided.")
 
-    response = llm.invoke(prompt)
+    if near_misses:
+        lines = ["Potential near-matches:"]
+        for scheme in near_misses[:5]:
+            gap = scheme["failed_reasons"][0] if scheme["failed_reasons"] else "One eligibility detail needs checking."
+            lines.append(f"- {scheme['name']}: {gap}")
+            lines.append(f"  Official details: {scheme['official_url']}")
+        sections.append("\n".join(lines))
+
+    sections.append("Please verify current eligibility and application details on the official scheme portal.")
     return {
         "results": results,
-        "reply": response.content,
+        "reply": "\n\n".join(sections),
         "is_complete": True,
     }
 
 
+def _route_after_extract(state: AgentState) -> str:
+    if get_missing_fields(state.get("profile") or {}):
+        return "ask_question"
+    return "evaluate_and_explain"
+
+
 def build_agent():
     graph = StateGraph(AgentState)
-    graph.add_node("extract", extract_node)
-    graph.add_node("ask_question", ask_question_node)
-    graph.add_node("evaluate_and_explain", evaluate_and_explain_node)
+    graph.add_node("extract", _extract_node)
+    graph.add_node("ask_question", _ask_question_node)
+    graph.add_node("evaluate_and_explain", _evaluate_and_explain_node)
 
     graph.add_edge(START, "extract")
     graph.add_conditional_edges(
         "extract",
-        route_after_extract,
+        _route_after_extract,
         {
             "ask_question": "ask_question",
             "evaluate_and_explain": "evaluate_and_explain",
@@ -214,7 +205,6 @@ def build_agent():
     )
     graph.add_edge("ask_question", END)
     graph.add_edge("evaluate_and_explain", END)
-
     return graph.compile()
 
 
