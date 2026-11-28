@@ -311,9 +311,14 @@
         return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
       }
 
+      function stripMarkdownEmphasis(value) {
+        return value.replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").trim();
+      }
+
       function parseMarkdownTableCell(value) {
-        const link = /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/i.exec(value);
-        return link ? {label: link[1], href: link[2]} : value;
+        const cleaned = stripMarkdownEmphasis(value);
+        const link = /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/i.exec(cleaned);
+        return link ? {label: link[1], href: link[2]} : cleaned;
       }
 
       function renderAssistantReply(parent, text) {
@@ -326,10 +331,10 @@
           const content = pendingText.join("\n").trim();
           if (content) {
             for (const block of content.split(/\n{2,}/)) {
-              const headingText = block.trim().replace(/:$/, "");
-              if (/^(eligible schemes|potential near-matches)$/i.test(headingText)) {
+              const headingText = block.trim().replace(/^#{1,6}\s*/, "").replace(/:$/, "");
+              if (/^(eligible schemes|(?:(?:potential)\s+)?near[- ]matches)\b/i.test(headingText)) {
                 const heading = document.createElement("h3");
-                heading.textContent = headingText;
+                heading.textContent = stripMarkdownEmphasis(headingText);
                 parent.appendChild(heading);
               } else {
                 const paragraph = document.createElement("p");
@@ -348,7 +353,7 @@
             isMarkdownTableSeparator(lines[index + 1])
           ) {
             flushText();
-            const columns = splitMarkdownTableRow(lines[index]);
+            const columns = splitMarkdownTableRow(lines[index]).map(stripMarkdownEmphasis);
             const rows = [];
             index += 2;
             while (index < lines.length && lines[index].trim() && lines[index].includes("|")) {
