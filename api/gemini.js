@@ -1,6 +1,11 @@
 const ALLOWED_ORIGIN = "https://amann0071.github.io";
+const GEMINI_MODEL = "gemini-3.8-flash";
 const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+function redactApiKey(message, apiKey) {
+  return String(message).split(apiKey).join("[REDACTED]").slice(0, 1000);
+}
 
 export default async function handler(req, res) {
   const origin = req.headers.origin;
@@ -42,7 +47,7 @@ export default async function handler(req, res) {
   }
 
   // The key exists only in Vercel's server-side environment.
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
     return res.status(500).json({ error: "Gemini is not configured on the server." });
   }
@@ -63,13 +68,43 @@ export default async function handler(req, res) {
       signal: controller.signal,
     });
 
-    if (!response.ok) {
-      const status = response.status === 429 ? 503 : 502;
-      return res.status(status).json({ error: "Gemini could not process the request." });
+    const responseText = await response.text();
+    let data = {};
+    let invalidJson = false;
+    if (responseText) {
+      try {
+        const parsed = JSON.parse(responseText);
+        data = parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        invalidJson = true;
+      }
     }
 
-    const data = await response.json();
-    const text = (data.candidates?.[0]?.content?.parts || [])
+    if (!response.ok) {
+      const upstreamMessage =
+        data.error &&
+        typeof data.error.message === "string" &&
+        data.error.message
+          ? data.error.message
+          : responseText || response.statusText || "Unknown Gemini API error.";
+      const safeMessage = redactApiKey(upstreamMessage, apiKey);
+      console.error("Gemini API request failed.", {
+        status: response.status,
+        message: safeMessage,
+      });
+      return res.status(response.status).json({
+        error: `Gemini API error (${response.status}): ${safeMessage}`,
+        upstreamStatus: response.status,
+      });
+    }
+
+    if (invalidJson) {
+      console.error("Gemini API returned invalid JSON.", { status: response.status });
+      return res.status(502).json({ error: "Gemini returned an invalid response." });
+    }
+
+    const parts = data.candidates?.[0]?.content?.parts;
+    const text = (Array.isArray(parts) ? parts : [])
       .map((part) => part.text || "")
       .join("")
       .trim();
@@ -79,9 +114,12 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ text });
   } catch (error) {
-    if (error.name === "AbortError") {
+    if (error instanceof Error && error.name === "AbortError") {
       return res.status(504).json({ error: "Gemini request timed out." });
     }
+    console.error("Gemini request failed.", {
+      message: redactApiKey(error instanceof Error ? error.message : error, apiKey),
+    });
     return res.status(502).json({ error: "Gemini is temporarily unavailable." });
   } finally {
     clearTimeout(timeout);
