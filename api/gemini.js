@@ -1,5 +1,5 @@
 const ALLOWED_ORIGIN = "https://amann0071.github.io";
-const GEMINI_MODEL = "gemini-3.8-flash";
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 const GEMINI_URL =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
