@@ -33,7 +33,7 @@
       <p>Ask in English or Hindi.</p>
       <div id="chat" aria-live="polite"></div>
       <form id="form">
-        <input id="message" placeholder="Type your message..." autocomplete="off" required>
+        <input id="message" placeholder="Type your message..." autocomplete="off" maxlength="1600" required>
         <button id="send" type="submit">Send</button>
       </form>
     </main>
@@ -42,8 +42,38 @@
       const form = document.getElementById("form");
       const input = document.getElementById("message");
       const send = document.getElementById("send");
+      const isGithubPages = window.location.hostname === "amann0071.github.io";
+      const GEMINI_API_URL = "https://ai-hackathon-silk.vercel.app/api/gemini";
       const apiBaseUrl = document.querySelector('meta[name="api-base-url"]').content.trim().replace(/\/$/, "");
       let sessionId = null;
+      let geminiHistory = [];
+
+      function buildGeminiPrompt() {
+        const instructions = "You are a helpful Indian government-scheme assistant. Ask one question at a time to learn age, occupation, social category, gender, and annual family income. Then list possible eligible schemes and near-matches, state unmet criteria, avoid inventing eligibility rules, and advise checking official portals.";
+        let turns = geminiHistory.slice(-8);
+        let conversation = turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n");
+        while (instructions.length + conversation.length + 2 > 2000 && turns.length > 1) {
+          turns = turns.slice(1);
+          conversation = turns.map((turn) => `${turn.role}: ${turn.content}`).join("\n");
+        }
+        const prompt = `${instructions}\n\n${conversation}`;
+        if (prompt.length > 2000) throw new Error("Message is too long. Please shorten it.");
+        return prompt;
+      }
+
+      async function sendToGemini() {
+        const response = await fetch(GEMINI_API_URL, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({prompt: buildGeminiPrompt()})
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `Chat request failed (HTTP ${response.status})`);
+        if (typeof data.text !== "string" || !data.text.trim()) {
+          throw new Error("The chat service returned an empty response.");
+        }
+        return data.text;
+      }
 
       function addTable(parent, title, columns, rows, getCells) {
         if (!rows.length) return;
@@ -121,8 +151,10 @@
       }
 
       async function reset() {
-        if (window.location.hostname.endsWith("github.io") && !apiBaseUrl) {
-          addMessage("assistant", "The chat API is not connected to this GitHub Pages site yet. Open the app at http://localhost:8000, or configure the public API URL for this deployment.");
+        if (isGithubPages) {
+          const greeting = "Namaste! I can help you discover Indian government schemes. What is your age and what do you currently do?";
+          geminiHistory = [{role: "assistant", content: greeting}];
+          addMessage("assistant", greeting);
           return;
         }
         const response = await fetch(`${apiBaseUrl}/reset`, { method: "POST", headers: {"Content-Type":"application/json"}, body:"{}" });
@@ -140,15 +172,22 @@
         input.value = "";
         send.disabled = true;
         try {
-          const response = await fetch(`${apiBaseUrl}/chat`, {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({session_id: sessionId, message: text})
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || "Chat request failed");
-          sessionId = data.session_id;
-          addMessage("assistant", data.reply, data.results);
+          if (isGithubPages) {
+            geminiHistory.push({role: "user", content: text});
+            const reply = await sendToGemini();
+            geminiHistory.push({role: "assistant", content: reply});
+            addMessage("assistant", reply);
+          } else {
+            const response = await fetch(`${apiBaseUrl}/chat`, {
+              method: "POST",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({session_id: sessionId, message: text})
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.detail || "Chat request failed");
+            sessionId = data.session_id;
+            addMessage("assistant", data.reply, data.results);
+          }
         } catch (error) {
           addMessage("assistant", `Error: ${error.message}`);
         } finally {
