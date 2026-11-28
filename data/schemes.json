@@ -253,6 +253,42 @@
     }
   },
   {
+    "id": "PM_KISAN",
+    "name": "Pradhan Mantri Kisan Samman Nidhi (PM-KISAN)",
+    "category": "Agriculture",
+    "ministry": "Ministry of Agriculture & Farmers Welfare",
+    "benefit_summary": "₹6,000 per year financial support paid in three equal installments of ₹2,000 every four months to eligible landholding farmer families.",
+    "benefit_score": 86,
+    "official_url": "https://pmkisan.gov.in/",
+    "rules": {
+      "min_age": 18,
+      "max_age": null,
+      "max_annual_income": null,
+      "occupations": ["farmer", "self_employed", "small_business"],
+      "social_categories": ["General", "OBC", "SC", "ST", "Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
+    "id": "NSP_MCM_MINORITY",
+    "name": "Merit-cum-Means Scholarship for Minority Students",
+    "category": "Education",
+    "ministry": "Ministry of Minority Affairs",
+    "benefit_summary": "Course fee support up to ₹20,000/year (or reimbursement for listed institutions) plus maintenance allowance for technical/professional courses.",
+    "benefit_score": 84,
+    "official_url": "https://scholarships.gov.in/",
+    "rules": {
+      "min_age": 16,
+      "max_age": 28,
+      "max_annual_income": 250000,
+      "occupations": ["student"],
+      "social_categories": ["Minority"],
+      "gender": ["Male", "Female", "Other"],
+      "requires_new_project": false
+    }
+  },
+  {
     "id": "NATIONAL_APPRENTICESHIP_NAPS",
     "name": "National Apprenticeship Promotion Scheme (NAPS)",
     "category": "Skill & Employment",
