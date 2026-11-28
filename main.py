@@ -1,7 +1,9 @@
 import uuid
+import os
 from pathlib import Path
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -13,6 +15,17 @@ STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Government Scheme-Matching Assistant")
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "https://amann0071.github.io").split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # Simple in-memory session store for hackathon/local runs
