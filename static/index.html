@@ -14,6 +14,13 @@
       .message { max-width: 78%; margin: 10px 0; padding: 12px 14px; border-radius: 12px; white-space: pre-wrap; }
       .assistant { background: #edf4ff; border: 1px solid #d8e6ff; }
       .user { margin-left: auto; background: #172033; color: white; }
+      .message.results { max-width: 100%; }
+      .results h3 { margin: 14px 0 8px; }
+      .results table { width: 100%; border-collapse: collapse; background: white; font-size: 14px; }
+      .results th, .results td { border: 1px solid #dce3ed; padding: 9px; text-align: left; vertical-align: top; }
+      .results th { background: #e8effb; }
+      .results a { color: #2457d6; }
+      .table-wrap { overflow-x: auto; margin-bottom: 14px; }
       form { display: flex; gap: 10px; margin-top: 14px; }
       input { flex: 1; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; font-size: 16px; }
       button { border: 0; border-radius: 8px; background: #2457d6; color: white; padding: 12px 18px; cursor: pointer; }
@@ -38,10 +45,77 @@
       const apiBaseUrl = document.querySelector('meta[name="api-base-url"]').content.trim().replace(/\/$/, "");
       let sessionId = null;
 
-      function addMessage(role, text) {
+      function addTable(parent, title, columns, rows, getCells) {
+        if (!rows.length) return;
+        const heading = document.createElement("h3");
+        heading.textContent = title;
+        parent.appendChild(heading);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "table-wrap";
+        const table = document.createElement("table");
+        const header = document.createElement("thead");
+        const headerRow = document.createElement("tr");
+        for (const column of columns) {
+          const cell = document.createElement("th");
+          cell.scope = "col";
+          cell.textContent = column;
+          headerRow.appendChild(cell);
+        }
+        header.appendChild(headerRow);
+        table.appendChild(header);
+
+        const body = document.createElement("tbody");
+        for (const row of rows) {
+          const tableRow = document.createElement("tr");
+          for (const value of getCells(row)) {
+            const cell = document.createElement("td");
+            if (value && typeof value === "object") {
+              const link = document.createElement("a");
+              link.href = value.href;
+              link.textContent = value.label;
+              link.target = "_blank";
+              link.rel = "noopener noreferrer";
+              cell.appendChild(link);
+            } else {
+              cell.textContent = value || "";
+            }
+            tableRow.appendChild(cell);
+          }
+          body.appendChild(tableRow);
+        }
+        table.appendChild(body);
+        wrapper.appendChild(table);
+        parent.appendChild(wrapper);
+      }
+
+      function addMessage(role, text, results) {
         const node = document.createElement("div");
         node.className = `message ${role}`;
-        node.textContent = text;
+        const eligible = results && results.exact_matches;
+        const nearMatches = results && results.near_misses;
+        if (role === "assistant" && (eligible?.length || nearMatches?.length)) {
+          node.classList.add("results");
+          const intro = document.createElement("p");
+          intro.textContent = "Here are the schemes matched against the details you provided:";
+          node.appendChild(intro);
+          addTable(node, "Eligible schemes", ["Scheme", "Category", "Benefit", "Official details"], eligible ? eligible.slice(0, 5) : [], (scheme) => [
+            scheme.name,
+            scheme.category,
+            scheme.benefit_summary,
+            {label: "View official site", href: scheme.official_url}
+          ]);
+          addTable(node, "Potential near-matches", ["Scheme", "Criteria to meet", "Official details"], nearMatches ? nearMatches.slice(0, 5) : [], (scheme) => [
+            scheme.name,
+            scheme.eligibility_guidance || scheme.failed_reasons?.join(" ") || "Check the scheme requirements.",
+            {label: "View official site", href: scheme.official_url}
+          ]);
+          const note = document.createElement("p");
+          note.textContent = "Please verify current eligibility and application details on the official scheme portal.";
+          node.appendChild(note);
+        } else {
+          node.textContent = text;
+        }
         chat.appendChild(node);
         chat.scrollTop = chat.scrollHeight;
       }
@@ -55,7 +129,7 @@
         if (!response.ok) throw new Error(`Could not start chat (HTTP ${response.status})`);
         const data = await response.json();
         sessionId = data.session_id;
-        addMessage("assistant", data.reply);
+        addMessage("assistant", data.reply, data.results);
       }
 
       form.addEventListener("submit", async (event) => {
@@ -74,7 +148,7 @@
           const data = await response.json();
           if (!response.ok) throw new Error(data.detail || "Chat request failed");
           sessionId = data.session_id;
-          addMessage("assistant", data.reply);
+          addMessage("assistant", data.reply, data.results);
         } catch (error) {
           addMessage("assistant", `Error: ${error.message}`);
         } finally {

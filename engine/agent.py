@@ -227,8 +227,9 @@ def _evaluate_and_explain_node(state: AgentState) -> Dict[str, Any]:
         lines = ["Potential near-matches:"]
         for scheme in near_misses[:5]:
             gap = scheme["failed_reasons"][0] if scheme["failed_reasons"] else "One eligibility detail needs checking."
+            scheme["eligibility_guidance"] = _explain_gap(gap)
             lines.append(f"- {scheme['name']}")
-            lines.append(f"  What you need to meet: {_explain_gap(gap)}")
+            lines.append(f"  What you need to meet: {scheme['eligibility_guidance']}")
             lines.append(f"  Official details: {scheme['official_url']}")
         sections.append("\n".join(lines))
 
