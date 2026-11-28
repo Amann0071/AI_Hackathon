@@ -27,14 +27,21 @@ def get_missing_fields(profile: Dict[str, Any]) -> List[str]:
     return missing
 
 
-def _extract_income(text: str) -> int | None:
+def _extract_income(text: str, allow_bare_amount: bool = False) -> int | None:
     match = re.search(
         r"\b(?:annual|family|household|yearly)?\s*income\b.{0,24}?"
         r"(?:₹|rs\.?\s*)?([\d,]+(?:\.\d+)?)\s*"
-        r"(lakh|lakhs|lac|lacs|l|crore|crores|cr|thousand|k)?\b",
+        r"(lakh|lakhs|lac|lacs|l|crore|crores|cr|thousand|k|rupees?|rs\.?)?\b",
         text,
         re.IGNORECASE,
     )
+    if not match and allow_bare_amount:
+        match = re.fullmatch(
+            r"\s*(?:₹|rs\.?\s*)?([\d,]+(?:\.\d+)?)\s*"
+            r"(lakh|lakhs|lac|lacs|l|crore|crores|cr|thousand|k|rupees?|rs\.?)?\s*",
+            text,
+            re.IGNORECASE,
+        )
     if not match:
         return None
 
@@ -62,11 +69,15 @@ def _extract_node(state: AgentState) -> Dict[str, Any]:
     lowered = text.lower()
     profile = dict(state.get("profile") or {})
     language = state.get("language") or "English"
+    missing_before = get_missing_fields(profile)
+    expected_field = missing_before[0] if missing_before else None
 
     age_match = re.search(
         r"\b(?:age|aged)\s*(?:is|:)?\s*(\d{1,3})\b|\bi am\s+(\d{1,3})\b",
         lowered,
     )
+    if not age_match and expected_field == "age":
+        age_match = re.fullmatch(r"\s*(\d{1,3})(?:\s*(?:years?|yrs?|yo))?\s*", lowered)
     if age_match:
         age = int(age_match.group(1) or age_match.group(2))
         if 0 <= age <= 120:
@@ -100,7 +111,7 @@ def _extract_node(state: AgentState) -> Dict[str, Any]:
     elif re.search(r"\b(?:nonbinary|non-binary|other gender)\b", lowered):
         profile["gender"] = "Other"
 
-    income = _extract_income(lowered)
+    income = _extract_income(lowered, allow_bare_amount=expected_field == "annual_income")
     if income is not None:
         profile["annual_income"] = income
 
@@ -108,6 +119,11 @@ def _extract_node(state: AgentState) -> Dict[str, Any]:
         profile["is_new_project"] = True
     elif re.search(r"\b(?:existing business|already running|not a new)\b", lowered):
         profile["is_new_project"] = False
+    elif expected_field == "is_new_project":
+        if re.fullmatch(r"\s*(?:yes|y|new)\s*[.!]?\s*", lowered):
+            profile["is_new_project"] = True
+        elif re.fullmatch(r"\s*(?:no|n|existing)\s*[.!]?\s*", lowered):
+            profile["is_new_project"] = False
 
     if re.search(r"[\u0900-\u097f]|\bhindi\b|\bहिंदी\b", lowered):
         language = "Hindi"
